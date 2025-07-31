@@ -1,9 +1,9 @@
 package com.example.crave.kitchen.portal.repository;
 
-import com.example.crave.kitchen.portal.entity.BusinessHoursEntity;
+import com.example.crave.kitchen.portal.entity.AuditLogEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 @Repository
-public interface BusinessHoursRepository extends JpaRepository<BusinessHoursEntity, Long> {
+public interface AuditLogRepository extends JpaRepository<AuditLogEntity, Long> {
 
 }

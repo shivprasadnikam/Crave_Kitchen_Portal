@@ -88,56 +88,46 @@ src/
 
 - `GET /` - Health check and API info
 - `GET /api/v1/health` - Health check endpoint
+- `GET /api/v1/info` - API information and available endpoints
 - `GET /h2-console` - H2 database console
 
-### User Management
+### Authentication Endpoints
 
-- `GET /api/v1/users` - Get all users
-- `GET /api/v1/users/{id}` - Get user by ID
-- `POST /api/v1/users` - Create new user
-- `PUT /api/v1/users/{id}` - Update user
-- `DELETE /api/v1/users/{id}` - Delete user
+- `POST /api/auth/register` - Register new vendor (comprehensive registration with validation)
+- `POST /api/auth/register/validate` - Validate registration data before submission
+- `POST /api/v1/auth/login` - User login
+- `GET /api/v1/auth/profile/{id}` - Get vendorsEntity profile
 
-### Recipe Management
+## Vendor Registration API
 
-- `GET /api/v1/recipes` - Get all recipes
-- `GET /api/v1/recipes/{id}` - Get recipe by ID
-- `POST /api/v1/recipes` - Create new recipe
-- `PUT /api/v1/recipes/{id}` - Update recipe
-- `DELETE /api/v1/recipes/{id}` - Delete recipe
+The vendor registration API provides comprehensive functionality for restaurant owners to register their businesses on the platform.
 
-### Recipe Search & Filtering
+### Features
 
-- `GET /api/v1/recipes/search?q={term}` - Search recipes by title/description
-- `GET /api/v1/recipes/search/title?title={title}` - Search by title
-- `GET /api/v1/recipes/cuisine/{cuisine}` - Filter by cuisine
-- `GET /api/v1/recipes/difficulty/{difficulty}` - Filter by difficulty
-- `GET /api/v1/recipes/user/{userId}` - Get recipes by user
-- `GET /api/v1/recipes/time/{maxTime}` - Filter by total time
-- `GET /api/v1/recipes/servings/{minServings}` - Filter by servings
+- **Complete Validation**: Email, password, phone, address, and business hours validation
+- **Business Hours Management**: Support for flexible operating hours per day
+- **Email Verification**: Automatic email verification token generation
+- **JWT Token Generation**: Access and refresh tokens for immediate authentication
+- **Admin Approval Workflow**: New vendors require admin approval before activation
 
-### Category Management
+### Validation Rules
 
-- `GET /api/v1/categories` - Get all categories
-- `GET /api/v1/categories/{id}` - Get category by ID
-- `POST /api/v1/categories` - Create new category
-- `PUT /api/v1/categories/{id}` - Update category
-- `DELETE /api/v1/categories/{id}` - Delete category
-- `GET /api/v1/categories/search?name={name}` - Search categories by name
-- `GET /api/v1/categories/name/{name}` - Get category by name
+- **Email**: Must be unique and valid format
+- **Password**: Minimum 8 characters with uppercase, lowercase, number, and special character
+- **Phone**: International format required (+1234567890)
+- **Address**: All fields required with valid ZIP code format
+- **Business Hours**: Opening time must be before closing time
+- **Terms**: Must accept terms and conditions
 
-### Ingredient Management
+### Response Structure
 
-- `GET /api/v1/ingredients` - Get all ingredients
-- `GET /api/v1/ingredients/{id}` - Get ingredient by ID
-- `POST /api/v1/ingredients` - Create new ingredient
-- `PUT /api/v1/ingredients/{id}` - Update ingredient
-- `DELETE /api/v1/ingredients/{id}` - Delete ingredient
-- `GET /api/v1/ingredients/search?name={name}` - Search ingredients by name
-- `GET /api/v1/ingredients/category/{category}` - Get ingredients by category
-- `GET /api/v1/ingredients/calories/max/{maxCalories}` - Get ingredients by max calories
-- `GET /api/v1/ingredients/calories/min/{minCalories}` - Get ingredients by min calories
-- `GET /api/v1/ingredients/name/{name}` - Get ingredient by name
+The API returns a comprehensive response including:
+
+- User information
+- Vendor profile details
+- Business hours configuration
+- JWT access and refresh tokens
+- Next steps for account activation
 
 ## Configuration
 
