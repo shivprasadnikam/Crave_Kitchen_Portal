@@ -27,12 +27,9 @@ public class VendorRegistrationServiceImpl implements VendorRegistrationService 
 
     private final VendorRepository vendorRepository;
 
-
     private final VendorProfileRepository vendorProfileRepository;
 
-
     private final BusinessHoursRepository businessHoursRepository;
-
 
     private final PasswordEncoder passwordEncoder;
 
@@ -49,14 +46,14 @@ public class VendorRegistrationServiceImpl implements VendorRegistrationService 
         vendorRepository.save(vendorsEntity);
 
         // Build response
-        return buildRegistrationResponse(vendorsEntity, vendorProfileEntity, dto.getBusinessHours(), "accessToken", "refreshToken");
+        return buildRegistrationResponse(vendorsEntity, vendorProfileEntity, dto.getBusinessHours(), "accessToken",
+                "refreshToken");
     }
 
     @Override
     public boolean validateRegistrationData(VendorRegistrationDto registrationDto) {
         return false;
     }
-
 
     private VendorsEntity createUser(VendorRegistrationDto dto) {
         VendorsEntity vendorsEntity = new VendorsEntity();
@@ -82,13 +79,14 @@ public class VendorRegistrationServiceImpl implements VendorRegistrationService 
         vendorProfileEntity.setZipCode(dto.getAddress().getZipCode());
         vendorProfileEntity.setCountry(dto.getAddress().getCountry());
         vendorProfileEntity.setPhone(dto.getPhone());
-        vendorProfileEntity.setIsApproved(false);
+        vendorProfileEntity.setIsApproved(true);
         vendorProfileEntity.setApprovalStatus(VendorProfileEntity.ApprovalStatus.PENDING);
 
         return vendorProfileRepository.save(vendorProfileEntity);
     }
 
-    private List<BusinessHoursEntity> createBusinessHours(VendorRegistrationDto dto, VendorProfileEntity vendorProfileEntity) {
+    private List<BusinessHoursEntity> createBusinessHours(VendorRegistrationDto dto,
+            VendorProfileEntity vendorProfileEntity) {
         List<BusinessHoursEntity> businessHoursEntityList = new ArrayList<>();
         DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -112,9 +110,10 @@ public class VendorRegistrationServiceImpl implements VendorRegistrationService 
         return businessHoursEntityList;
     }
 
-    private VendorRegistrationResponseDto buildRegistrationResponse(VendorsEntity vendorsEntity, VendorProfileEntity vendorProfileEntity,
-                                                                    Map<String, VendorRegistrationDto.BusinessHoursDto> businessHoursDto,
-                                                                    String accessToken, String refreshToken) {
+    private VendorRegistrationResponseDto buildRegistrationResponse(VendorsEntity vendorsEntity,
+            VendorProfileEntity vendorProfileEntity,
+            Map<String, VendorRegistrationDto.BusinessHoursDto> businessHoursDto,
+            String accessToken, String refreshToken) {
 
         // Build user DTO
         VendorRegistrationResponseDto.UserDto userDto = VendorRegistrationResponseDto.UserDto.builder()
