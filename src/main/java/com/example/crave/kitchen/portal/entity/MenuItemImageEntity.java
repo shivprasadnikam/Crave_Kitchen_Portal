@@ -17,7 +17,8 @@ import java.time.LocalDateTime;
 public class MenuItemImageEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "menu_item_image_seq")
+    @SequenceGenerator(name = "menu_item_image_seq", sequenceName = "menu_item_image_seq", allocationSize = 1)
     private Long id;
 
     @Column(name = "menu_item_id", nullable = false)

@@ -21,7 +21,20 @@ public interface MenuCategoryRepository extends JpaRepository<MenuCategoryEntity
 
     Optional<MenuCategoryEntity> findByVendorIdAndNameAndIsActive(Long vendorId, String name, Boolean isActive);
 
-    // Pagination support
+    // Pagination support - using custom queries for Oracle compatibility
+    @Query(value = "SELECT * FROM (SELECT a.*, ROWNUM rnum FROM (SELECT * FROM ck_menu_categories WHERE vendor_id = :vendorId ORDER BY display_order ASC) a WHERE ROWNUM <= :maxRow) WHERE rnum > :minRow", nativeQuery = true)
+    List<MenuCategoryEntity> findByVendorIdWithPagination(@Param("vendorId") Long vendorId, @Param("minRow") int minRow, @Param("maxRow") int maxRow);
+
+    @Query(value = "SELECT * FROM (SELECT a.*, ROWNUM rnum FROM (SELECT * FROM ck_menu_categories WHERE vendor_id = :vendorId AND is_active = :isActive ORDER BY display_order ASC) a WHERE ROWNUM <= :maxRow) WHERE rnum > :minRow", nativeQuery = true)
+    List<MenuCategoryEntity> findByVendorIdAndIsActiveWithPagination(@Param("vendorId") Long vendorId, @Param("isActive") Boolean isActive, @Param("minRow") int minRow, @Param("maxRow") int maxRow);
+
+    @Query(value = "SELECT * FROM (SELECT a.*, ROWNUM rnum FROM (SELECT * FROM ck_menu_categories WHERE vendor_id = :vendorId AND is_featured = :isFeatured ORDER BY display_order ASC) a WHERE ROWNUM <= :maxRow) WHERE rnum > :minRow", nativeQuery = true)
+    List<MenuCategoryEntity> findByVendorIdAndIsFeaturedWithPagination(@Param("vendorId") Long vendorId, @Param("isFeatured") Boolean isFeatured, @Param("minRow") int minRow, @Param("maxRow") int maxRow);
+
+    @Query(value = "SELECT * FROM (SELECT a.*, ROWNUM rnum FROM (SELECT * FROM ck_menu_categories WHERE vendor_id = :vendorId AND is_active = :isActive AND is_featured = :isFeatured ORDER BY display_order ASC) a WHERE ROWNUM <= :maxRow) WHERE rnum > :minRow", nativeQuery = true)
+    List<MenuCategoryEntity> findByVendorIdAndIsActiveAndIsFeaturedWithPagination(@Param("vendorId") Long vendorId, @Param("isActive") Boolean isActive, @Param("isFeatured") Boolean isFeatured, @Param("minRow") int minRow, @Param("maxRow") int maxRow);
+
+    // Keep original methods for backward compatibility but they may not work with pagination
     Page<MenuCategoryEntity> findByVendorId(Long vendorId, Pageable pageable);
 
     Page<MenuCategoryEntity> findByVendorIdAndIsActive(Long vendorId, Boolean isActive, Pageable pageable);
@@ -49,4 +62,17 @@ public interface MenuCategoryRepository extends JpaRepository<MenuCategoryEntity
     long countByVendorIdAndIsActive(Long vendorId, Boolean isActive);
 
     long countByVendorIdAndIsFeatured(Long vendorId, Boolean isFeatured);
+
+    // Count methods for pagination
+    @Query(value = "SELECT COUNT(*) FROM ck_menu_categories WHERE vendor_id = :vendorId", nativeQuery = true)
+    long countByVendorIdNative(@Param("vendorId") Long vendorId);
+
+    @Query(value = "SELECT COUNT(*) FROM ck_menu_categories WHERE vendor_id = :vendorId AND is_active = :isActive", nativeQuery = true)
+    long countByVendorIdAndIsActiveNative(@Param("vendorId") Long vendorId, @Param("isActive") Boolean isActive);
+
+    @Query(value = "SELECT COUNT(*) FROM ck_menu_categories WHERE vendor_id = :vendorId AND is_featured = :isFeatured", nativeQuery = true)
+    long countByVendorIdAndIsFeaturedNative(@Param("vendorId") Long vendorId, @Param("isFeatured") Boolean isFeatured);
+
+    @Query(value = "SELECT COUNT(*) FROM ck_menu_categories WHERE vendor_id = :vendorId AND is_active = :isActive AND is_featured = :isFeatured", nativeQuery = true)
+    long countByVendorIdAndIsActiveAndIsFeaturedNative(@Param("vendorId") Long vendorId, @Param("isActive") Boolean isActive, @Param("isFeatured") Boolean isFeatured);
 }

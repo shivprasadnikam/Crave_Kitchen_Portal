@@ -17,7 +17,8 @@ import java.time.LocalDateTime;
 public class VendorsEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "vendor_seq")
+    @SequenceGenerator(name = "vendor_seq", sequenceName = "vendor_seq", allocationSize = 1)
     private Long id;
 
     @Column(name = "email", unique = true, nullable = false, length = 255)

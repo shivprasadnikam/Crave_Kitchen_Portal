@@ -7,6 +7,7 @@ import com.example.crave.kitchen.portal.service.MenuService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,27 +36,62 @@ public class MenuServiceImpl implements MenuService {
     @Override
     public Page<MenuCategoryDto> getAllCategories(Long vendorId, Boolean isActive, Boolean isFeatured,
             Pageable pageable) {
-        log.info("Fetching menu categories for vendorId: {}, isActive: {}, isFeatured: {}, page: {}, size: {}",
+        log.info("=== MENU SERVICE - GET ALL CATEGORIES ===");
+        log.info("Parameters - vendorId: {}, isActive: {}, isFeatured: {}, page: {}, size: {}",
                 vendorId, isActive, isFeatured, pageable.getPageNumber(), pageable.getPageSize());
 
         try {
-            Page<MenuCategoryEntity> categories;
+            List<MenuCategoryEntity> categories;
+            long totalElements;
+            String filterType = "ALL";
+            
+            // Calculate pagination parameters
+            int pageNumber = pageable.getPageNumber();
+            int pageSize = pageable.getPageSize();
+            int minRow = pageNumber * pageSize;
+            int maxRow = (pageNumber + 1) * pageSize;
+            
+            log.debug("Pagination parameters - minRow: {}, maxRow: {}, pageSize: {}", minRow, maxRow, pageSize);
+            
             if (isActive != null && isFeatured != null) {
-                categories = menuCategoryRepository.findByVendorIdAndIsActiveAndIsFeatured(vendorId, isActive,
-                        isFeatured, pageable);
+                categories = menuCategoryRepository.findByVendorIdAndIsActiveAndIsFeaturedWithPagination(vendorId, isActive,
+                        isFeatured, minRow, maxRow);
+                totalElements = menuCategoryRepository.countByVendorIdAndIsActiveAndIsFeaturedNative(vendorId, isActive, isFeatured);
+                filterType = "ACTIVE_AND_FEATURED";
             } else if (isActive != null) {
-                categories = menuCategoryRepository.findByVendorIdAndIsActive(vendorId, isActive, pageable);
+                categories = menuCategoryRepository.findByVendorIdAndIsActiveWithPagination(vendorId, isActive, minRow, maxRow);
+                totalElements = menuCategoryRepository.countByVendorIdAndIsActiveNative(vendorId, isActive);
+                filterType = "ACTIVE_ONLY";
             } else if (isFeatured != null) {
-                categories = menuCategoryRepository.findByVendorIdAndIsFeatured(vendorId, isFeatured, pageable);
+                categories = menuCategoryRepository.findByVendorIdAndIsFeaturedWithPagination(vendorId, isFeatured, minRow, maxRow);
+                totalElements = menuCategoryRepository.countByVendorIdAndIsFeaturedNative(vendorId, isFeatured);
+                filterType = "FEATURED_ONLY";
             } else {
-                categories = menuCategoryRepository.findByVendorId(vendorId, pageable);
+                categories = menuCategoryRepository.findByVendorIdWithPagination(vendorId, minRow, maxRow);
+                totalElements = menuCategoryRepository.countByVendorIdNative(vendorId);
+                filterType = "ALL";
             }
 
-            Page<MenuCategoryDto> result = categories.map(this::convertToCategoryDto);
-            log.info("Successfully fetched {} categories for vendorId: {}", result.getTotalElements(), vendorId);
+            log.debug("Database query executed with filter type: {}", filterType);
+            
+            // Convert to DTOs
+            List<MenuCategoryDto> categoryDtos = categories.stream()
+                    .map(this::convertToCategoryDto)
+                    .collect(Collectors.toList());
+            
+            // Create Page object manually
+            Page<MenuCategoryDto> result = new PageImpl<>(categoryDtos, pageable, totalElements);
+            
+            log.info("=== SUCCESS ===");
+            log.info("Retrieved {} categories for vendorId: {} (Page {} of {})", 
+                    result.getTotalElements(), vendorId, pageable.getPageNumber() + 1, result.getTotalPages());
+            log.info("Categories in current page: {}", result.getContent().size());
+            
             return result;
         } catch (Exception e) {
-            log.error("Error fetching menu categories for vendorId: {}", vendorId, e);
+            log.error("=== ERROR ===");
+            log.error("Failed to fetch menu categories for vendorId: {}", vendorId, e);
+            log.error("Error type: {}", e.getClass().getSimpleName());
             throw e;
         }
     }
@@ -81,7 +117,11 @@ public class MenuServiceImpl implements MenuService {
 
     @Override
     public MenuCategoryDto createCategory(Long vendorId, CreateMenuCategoryRequestDto requestDto) {
-        log.info("Creating new menu category: {} for vendorId: {}", requestDto.getName(), vendorId);
+        log.info("=== MENU SERVICE - CREATE CATEGORY ===");
+        log.info("Creating category - Name: '{}', VendorId: {}", requestDto.getName(), vendorId);
+        log.info("Category details - Description: '{}', DisplayOrder: {}, IsActive: {}, IsFeatured: {}",
+                requestDto.getDescription() != null ? requestDto.getDescription().substring(0, Math.min(50, requestDto.getDescription().length())) + "..." : "null",
+                requestDto.getDisplayOrder(), requestDto.getIsActive(), requestDto.getIsFeatured());
 
         try {
             MenuCategoryEntity category = new MenuCategoryEntity();
@@ -95,13 +135,20 @@ public class MenuServiceImpl implements MenuService {
             category.setCreatedAt(LocalDateTime.now());
             category.setUpdatedAt(LocalDateTime.now());
 
+            log.debug("Category entity prepared for persistence");
             MenuCategoryEntity savedCategory = menuCategoryRepository.save(category);
-            log.info("Successfully created menu category with ID: {} and name: {}",
-                    savedCategory.getId(), savedCategory.getName());
+            
+            log.info("=== SUCCESS ===");
+            log.info("Category created successfully - ID: {}, Name: '{}', VendorId: {}", 
+                    savedCategory.getId(), savedCategory.getName(), savedCategory.getVendorId());
+            log.info("Category created at: {}", savedCategory.getCreatedAt());
 
             return convertToCategoryDto(savedCategory);
         } catch (Exception e) {
-            log.error("Error creating menu category: {}", requestDto.getName(), e);
+            log.error("=== ERROR ===");
+            log.error("Failed to create category: '{}' for vendorId: {}", requestDto.getName(), vendorId, e);
+            log.error("Error type: {}", e.getClass().getSimpleName());
+            log.error("Error message: {}", e.getMessage());
             throw e;
         }
     }
@@ -224,16 +271,28 @@ public class MenuServiceImpl implements MenuService {
 
     @Override
     public MenuItemDto createMenuItem(Long vendorId, CreateMenuItemRequestDto requestDto) {
-        log.info("Creating new menu item: {} for vendorId: {}", requestDto.getName(), vendorId);
+        log.info("=== MENU SERVICE - CREATE MENU ITEM ===");
+        log.info("Creating menu item - Name: '{}', VendorId: {}, CategoryId: {}", 
+                requestDto.getName(), vendorId, requestDto.getCategoryId());
+        log.info("Item details - Price: {}, IsAvailable: {}, IsFeatured: {}", 
+                requestDto.getPrice(), requestDto.getIsAvailable(), requestDto.getIsFeatured());
+        log.info("Dietary info - Vegetarian: {}, Vegan: {}, GlutenFree: {}, Spicy: {}", 
+                requestDto.getIsVegetarian(), requestDto.getIsVegan(), requestDto.getIsGlutenFree(), requestDto.getIsSpicy());
 
         try {
             // Validate category exists and belongs to the vendor
+            log.debug("Validating category with ID: {} for vendorId: {}", requestDto.getCategoryId(), vendorId);
             Optional<MenuCategoryEntity> category = menuCategoryRepository.findById(requestDto.getCategoryId());
             if (category.isEmpty() || !category.get().getVendorId().equals(vendorId)) {
-                log.error("Category not found with ID: {} for vendorId: {} for menu item: {}",
+                log.error("=== VALIDATION ERROR ===");
+                log.error("Category not found with ID: {} for vendorId: {} for menu item: '{}'",
                         requestDto.getCategoryId(), vendorId, requestDto.getName());
+                if (category.isPresent()) {
+                    log.error("Category exists but belongs to different vendor: {}", category.get().getVendorId());
+                }
                 throw new IllegalArgumentException("Category not found with ID: " + requestDto.getCategoryId());
             }
+            log.debug("Category validation successful - Category: '{}'", category.get().getName());
 
             MenuItemEntity item = new MenuItemEntity();
             item.setVendorId(vendorId);
@@ -260,13 +319,20 @@ public class MenuServiceImpl implements MenuService {
             item.setCreatedAt(LocalDateTime.now());
             item.setUpdatedAt(LocalDateTime.now());
 
+            log.debug("Menu item entity prepared for persistence");
             MenuItemEntity savedItem = menuItemRepository.save(item);
-            log.info("Successfully created menu item with ID: {} and name: {}",
-                    savedItem.getId(), savedItem.getName());
+            
+            log.info("=== SUCCESS ===");
+            log.info("Menu item created successfully - ID: {}, Name: '{}', VendorId: {}, CategoryId: {}", 
+                    savedItem.getId(), savedItem.getName(), savedItem.getVendorId(), savedItem.getCategoryId());
+            log.info("Item created at: {}", savedItem.getCreatedAt());
 
             return convertToMenuItemDto(savedItem);
         } catch (Exception e) {
-            log.error("Error creating menu item: {}", requestDto.getName(), e);
+            log.error("=== ERROR ===");
+            log.error("Failed to create menu item: '{}' for vendorId: {}", requestDto.getName(), vendorId, e);
+            log.error("Error type: {}", e.getClass().getSimpleName());
+            log.error("Error message: {}", e.getMessage());
             throw e;
         }
     }

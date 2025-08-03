@@ -28,6 +28,8 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,7 +38,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Slf4j
 @Validated
-public class MenuController {
+public class MenuController extends BaseController {
 
         private final MenuService menuService;
 
@@ -45,9 +47,6 @@ public class MenuController {
 
         @Autowired
         private JwtTokenService jwtTokenService;
-
-        @Autowired
-        private TokenDataExtractor tokenDataExtractor;
 
         // =====================================================
         // UTILITY METHODS
@@ -143,6 +142,67 @@ public class MenuController {
                 }
         }
 
+        @GetMapping("/test-pagination")
+        public ResponseEntity<ApiResponseDto<Map<String, Object>>> testPagination(
+                        @RequestParam(defaultValue = "0") int page,
+                        @RequestParam(defaultValue = "5") int size) {
+                log.info("=== TEST PAGINATION ENDPOINT ===");
+                log.info("Testing pagination with page: {}, size: {}", page, size);
+
+                try {
+                        Long vendorId = getCurrentVendorId();
+
+                        // Create pageable object
+                        Pageable pageable = PageRequest.of(page, size, Sort.by("displayOrder").ascending());
+
+                        // Test the pagination
+                        Page<MenuCategoryDto> categories = menuService.getAllCategories(vendorId, null, null, pageable);
+
+                        Map<String, Object> result = new HashMap<>();
+                        result.put("vendorId", vendorId);
+                        result.put("page", page);
+                        result.put("size", size);
+                        result.put("totalElements", categories.getTotalElements());
+                        result.put("totalPages", categories.getTotalPages());
+                        result.put("currentPage", categories.getNumber());
+                        result.put("hasNext", categories.hasNext());
+                        result.put("hasPrevious", categories.hasPrevious());
+                        result.put("categoriesCount", categories.getContent().size());
+                        result.put("categories", categories.getContent());
+                        result.put("timestamp", LocalDateTime.now());
+                        result.put("status", "success");
+
+                        log.info("=== SUCCESS ===");
+                        log.info("Pagination test successful - totalElements: {}, totalPages: {}, currentPage: {}",
+                                        categories.getTotalElements(), categories.getTotalPages(),
+                                        categories.getNumber());
+
+                        return ResponseEntity.ok(ApiResponseDto.<Map<String, Object>>builder()
+                                        .success(true)
+                                        .message("Pagination test successful")
+                                        .data(result)
+                                        .build());
+                } catch (Exception e) {
+                        log.error("=== ERROR ===");
+                        log.error("Pagination test failed", e);
+                        log.error("Error type: {}", e.getClass().getSimpleName());
+                        log.error("Error message: {}", e.getMessage());
+
+                        Map<String, Object> result = new HashMap<>();
+                        result.put("error", e.getMessage());
+                        result.put("errorType", e.getClass().getSimpleName());
+                        result.put("timestamp", LocalDateTime.now());
+                        result.put("status", "error");
+
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                        .body(ApiResponseDto.<Map<String, Object>>builder()
+                                                        .success(false)
+                                                        .message("Pagination test failed: " + e.getMessage())
+                                                        .data(result)
+                                                        .build());
+                }
+        }
+
         /**
          * Extract token from request for debugging
          */
@@ -168,9 +228,10 @@ public class MenuController {
         }
 
         /**
-         * Extract vendor ID from the JWT token
+         * Extract vendor ID from the JWT token (overrides BaseController method)
          */
-        private Long getCurrentVendorId() {
+        @Override
+        protected Long getCurrentVendorId() {
                 // Use the utility class to extract vendor ID from token
                 Long vendorId = tokenDataExtractor.getCurrentVendorId();
                 if (vendorId != null) {
@@ -217,8 +278,10 @@ public class MenuController {
                         @RequestParam(defaultValue = "displayOrder") String sortBy,
                         @RequestParam(defaultValue = "asc") String sortDir) {
 
-                log.info("GET /api/menu/categories - vendorId: {}, isActive: {}, isFeatured: {}, page: {}, size: {}, sortBy: {}, sortDir: {}",
+                log.info("=== MENU CATEGORIES - GET ALL ===");
+                log.info("Request Parameters - vendorId: {}, isActive: {}, isFeatured: {}, page: {}, size: {}, sortBy: {}, sortDir: {}",
                                 vendorId, isActive, isFeatured, page, size, sortBy, sortDir);
+                log.info("Request URL: GET /api/menu/categories");
 
                 try {
                         Sort sort = Sort.by(Sort.Direction.fromString(sortDir), sortBy);
@@ -227,8 +290,10 @@ public class MenuController {
                         Page<MenuCategoryDto> categories = menuService.getAllCategories(vendorId, isActive, isFeatured,
                                         pageable);
 
-                        log.info("Successfully retrieved {} categories for vendorId: {}", categories.getTotalElements(),
-                                        vendorId);
+                        log.info("=== SUCCESS ===");
+                        log.info("Retrieved {} categories for vendorId: {} (Page {} of {})",
+                                        categories.getTotalElements(), vendorId, page + 1, categories.getTotalPages());
+                        log.info("Categories in current page: {}", categories.getContent().size());
 
                         return ResponseEntity.ok(ApiResponseDto.<Page<MenuCategoryDto>>builder()
                                         .success(true)
@@ -236,7 +301,9 @@ public class MenuController {
                                         .data(categories)
                                         .build());
                 } catch (Exception e) {
-                        log.error("Error retrieving categories for vendorId: {}", vendorId, e);
+                        log.error("=== ERROR ===");
+                        log.error("Failed to retrieve categories for vendorId: {}", vendorId, e);
+                        log.error("Error details: {}", e.getMessage());
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                                         .body(ApiResponseDto.<Page<MenuCategoryDto>>builder()
                                                         .success(false)
@@ -279,15 +346,30 @@ public class MenuController {
         @PostMapping("/categories")
         public ResponseEntity<ApiResponseDto<MenuCategoryDto>> createCategory(
                         @Valid @RequestBody CreateMenuCategoryRequestDto requestDto) {
-                log.info("POST /api/menu/categories - Creating category: {}", requestDto.getName());
+                log.info("=== MENU CATEGORIES - CREATE ===");
+                log.info("Request URL: POST /api/menu/categories");
+                log.info("Category Details - Name: '{}', Description: '{}', DisplayOrder: {}, IsActive: {}, IsFeatured: {}",
+                                requestDto.getName(),
+                                requestDto.getDescription() != null
+                                                ? requestDto.getDescription().substring(0,
+                                                                Math.min(50, requestDto.getDescription().length()))
+                                                                + "..."
+                                                : "null",
+                                requestDto.getDisplayOrder(),
+                                requestDto.getIsActive(),
+                                requestDto.getIsFeatured());
 
                 try {
                         Long vendorId = getCurrentVendorId();
+                        log.info("Extracted vendorId from token: {}", vendorId);
 
                         MenuCategoryDto createdCategory = menuService.createCategory(vendorId, requestDto);
 
-                        log.info("Successfully created category with ID: {} and name: {}",
-                                        createdCategory.getId(), createdCategory.getName());
+                        log.info("=== SUCCESS ===");
+                        log.info("Category created successfully - ID: {}, Name: '{}', VendorId: {}",
+                                        createdCategory.getId(), createdCategory.getName(),
+                                        createdCategory.getVendorId());
+                        log.info("Category created at: {}", createdCategory.getCreatedAt());
 
                         return ResponseEntity.status(HttpStatus.CREATED)
                                         .body(ApiResponseDto.<MenuCategoryDto>builder()
@@ -296,7 +378,10 @@ public class MenuController {
                                                         .data(createdCategory)
                                                         .build());
                 } catch (Exception e) {
-                        log.error("Error creating category: {}", requestDto.getName(), e);
+                        log.error("=== ERROR ===");
+                        log.error("Failed to create category: '{}'", requestDto.getName(), e);
+                        log.error("Error type: {}", e.getClass().getSimpleName());
+                        log.error("Error message: {}", e.getMessage());
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                                         .body(ApiResponseDto.<MenuCategoryDto>builder()
                                                         .success(false)
@@ -460,15 +545,31 @@ public class MenuController {
         @PostMapping("/items")
         public ResponseEntity<ApiResponseDto<MenuItemDto>> createMenuItem(
                         @Valid @RequestBody CreateMenuItemRequestDto requestDto) {
-                log.info("POST /api/menu/items - Creating menu item: {}", requestDto.getName());
+                log.info("=== MENU ITEMS - CREATE ===");
+                log.info("Request URL: POST /api/menu/items");
+                log.info("Menu Item Details - Name: '{}', CategoryId: {}, Price: {}, IsAvailable: {}, IsFeatured: {}",
+                                requestDto.getName(),
+                                requestDto.getCategoryId(),
+                                requestDto.getPrice(),
+                                requestDto.getIsAvailable(),
+                                requestDto.getIsFeatured());
+                log.info("Dietary Info - Vegetarian: {}, Vegan: {}, GlutenFree: {}, Spicy: {}",
+                                requestDto.getIsVegetarian(),
+                                requestDto.getIsVegan(),
+                                requestDto.getIsGlutenFree(),
+                                requestDto.getIsSpicy());
 
                 try {
                         Long vendorId = getCurrentVendorId();
+                        log.info("Extracted vendorId from token: {}", vendorId);
 
                         MenuItemDto createdItem = menuService.createMenuItem(vendorId, requestDto);
 
-                        log.info("Successfully created menu item with ID: {} and name: {}",
-                                        createdItem.getId(), createdItem.getName());
+                        log.info("=== SUCCESS ===");
+                        log.info("Menu item created successfully - ID: {}, Name: '{}', VendorId: {}, CategoryId: {}",
+                                        createdItem.getId(), createdItem.getName(), createdItem.getVendorId(),
+                                        createdItem.getCategoryId());
+                        log.info("Item created at: {}", createdItem.getCreatedAt());
 
                         return ResponseEntity.status(HttpStatus.CREATED)
                                         .body(ApiResponseDto.<MenuItemDto>builder()
@@ -477,7 +578,10 @@ public class MenuController {
                                                         .data(createdItem)
                                                         .build());
                 } catch (Exception e) {
-                        log.error("Error creating menu item: {}", requestDto.getName(), e);
+                        log.error("=== ERROR ===");
+                        log.error("Failed to create menu item: '{}'", requestDto.getName(), e);
+                        log.error("Error type: {}", e.getClass().getSimpleName());
+                        log.error("Error message: {}", e.getMessage());
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                                         .body(ApiResponseDto.<MenuItemDto>builder()
                                                         .success(false)
