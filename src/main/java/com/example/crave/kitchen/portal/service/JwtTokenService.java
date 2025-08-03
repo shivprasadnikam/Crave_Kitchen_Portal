@@ -40,10 +40,24 @@ public class JwtTokenService {
     }
 
     /**
+     * Generate access token for user with vendor information
+     */
+    public String generateAccessToken(UserDetails userDetails, Long vendorId) {
+        return generateToken(userDetails, vendorId, accessTokenExpiration * 1000);
+    }
+
+    /**
      * Generate refresh token for user
      */
     public String generateRefreshToken(UserDetails userDetails) {
         return generateToken(userDetails, refreshTokenExpiration * 1000);
+    }
+
+    /**
+     * Generate refresh token for user with vendor information
+     */
+    public String generateRefreshToken(UserDetails userDetails, Long vendorId) {
+        return generateToken(userDetails, vendorId, refreshTokenExpiration * 1000);
     }
 
     /**
@@ -56,7 +70,22 @@ public class JwtTokenService {
         claims.put("accountNonExpired", userDetails.isAccountNonExpired());
         claims.put("accountNonLocked", userDetails.isAccountNonLocked());
         claims.put("credentialsNonExpired", userDetails.isCredentialsNonExpired());
-        
+
+        return createToken(claims, userDetails.getUsername(), expiration);
+    }
+
+    /**
+     * Generate token with custom claims including vendor information
+     */
+    public String generateToken(UserDetails userDetails, Long vendorId, long expiration) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("authorities", userDetails.getAuthorities());
+        claims.put("enabled", userDetails.isEnabled());
+        claims.put("accountNonExpired", userDetails.isAccountNonExpired());
+        claims.put("accountNonLocked", userDetails.isAccountNonLocked());
+        claims.put("credentialsNonExpired", userDetails.isCredentialsNonExpired());
+        claims.put("vendorId", vendorId);
+
         return createToken(claims, userDetails.getUsername(), expiration);
     }
 
@@ -217,6 +246,26 @@ public class JwtTokenService {
     }
 
     /**
+     * Extract vendor ID from token
+     */
+    public Long extractVendorId(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            logger.debug("Extracted claims: {}", claims);
+            
+            Object vendorIdObj = claims.get("vendorId");
+            logger.debug("Vendor ID object from claims: {} (type: {})", vendorIdObj, vendorIdObj != null ? vendorIdObj.getClass().getSimpleName() : "null");
+            
+            Long vendorId = claims.get("vendorId", Long.class);
+            logger.debug("Extracted vendor ID: {}", vendorId);
+            return vendorId;
+        } catch (Exception e) {
+            logger.error("Failed to extract vendor ID from token: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+
+    /**
      * Extract authorities from token
      */
     public String extractAuthorities(String token) {
@@ -228,4 +277,40 @@ public class JwtTokenService {
             return null;
         }
     }
-} 
+
+    /**
+     * Extract all claims from token as a Map
+     */
+    public Map<String, Object> extractAllClaimsAsMap(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            Map<String, Object> claimsMap = new HashMap<>();
+            claimsMap.put("email", claims.getSubject());
+            claimsMap.put("vendorId", claims.get("vendorId"));
+            claimsMap.put("authorities", claims.get("authorities"));
+            claimsMap.put("enabled", claims.get("enabled"));
+            claimsMap.put("accountNonExpired", claims.get("accountNonExpired"));
+            claimsMap.put("accountNonLocked", claims.get("accountNonLocked"));
+            claimsMap.put("credentialsNonExpired", claims.get("credentialsNonExpired"));
+            claimsMap.put("issuedAt", claims.getIssuedAt());
+            claimsMap.put("expiration", claims.getExpiration());
+            return claimsMap;
+        } catch (Exception e) {
+            logger.error("Failed to extract all claims from token: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Extract specific claim by key
+     */
+    public <T> T extractClaimByKey(String token, String key, Class<T> clazz) {
+        try {
+            Claims claims = extractAllClaims(token);
+            return claims.get(key, clazz);
+        } catch (Exception e) {
+            logger.error("Failed to extract claim '{}' from token: {}", key, e.getMessage());
+            return null;
+        }
+    }
+}

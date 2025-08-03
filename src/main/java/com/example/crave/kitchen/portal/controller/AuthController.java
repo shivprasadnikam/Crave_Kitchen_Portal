@@ -2,6 +2,7 @@ package com.example.crave.kitchen.portal.controller;
 
 import com.example.crave.kitchen.portal.dto.ApiResponseDto;
 import com.example.crave.kitchen.portal.entity.VendorsEntity;
+import com.example.crave.kitchen.portal.repository.VendorRepository;
 import com.example.crave.kitchen.portal.service.CustomUserDetailsService;
 import com.example.crave.kitchen.portal.service.JwtTokenService;
 import org.slf4j.Logger;
@@ -37,6 +38,9 @@ public class AuthController {
     @Autowired
     private JwtTokenService jwtTokenService;
 
+    @Autowired
+    private VendorRepository vendorRepository;
+
     /**
      * Login endpoint
      */
@@ -50,9 +54,15 @@ public class AuthController {
             // Get user details
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
 
-            // Generate tokens
-            String accessToken = jwtTokenService.generateAccessToken(userDetails);
-            String refreshToken = jwtTokenService.generateRefreshToken(userDetails);
+
+
+            // Get vendor information
+            VendorsEntity vendor = vendorRepository.findByEmail(loginRequest.getEmail())
+                    .orElseThrow(() -> new RuntimeException("Vendor not found"));
+
+            // Generate tokens with vendor information
+            String accessToken = jwtTokenService.generateAccessToken(userDetails, vendor.getId());
+            String refreshToken = jwtTokenService.generateRefreshToken(userDetails, vendor.getId());
 
             // Prepare response
             Map<String, Object> data = new HashMap<>();
@@ -60,6 +70,9 @@ public class AuthController {
             data.put("refreshToken", refreshToken);
             data.put("tokenType", "Bearer");
             data.put("expiresIn", 3600); // 1 hour
+            data.put("vendorId", vendor.getId());
+            data.put("vendorEmail", vendor.getEmail());
+            data.put("vendorName", vendor.getFullName());
             data.put("user", userDetails);
 
             return ResponseEntity.ok(ApiResponseDto.builder()
@@ -104,14 +117,23 @@ public class AuthController {
             String email = jwtTokenService.extractEmail(refreshRequest.getRefreshToken());
             UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-            // Generate new access token
-            String newAccessToken = jwtTokenService.generateAccessToken(userDetails);
+
+
+            // Get vendor information
+            VendorsEntity vendor = vendorRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("Vendor not found"));
+
+            // Generate new access token with vendor information
+            String newAccessToken = jwtTokenService.generateAccessToken(userDetails, vendor.getId());
 
             // Prepare response
             Map<String, Object> data = new HashMap<>();
             data.put("accessToken", newAccessToken);
             data.put("tokenType", "Bearer");
             data.put("expiresIn", 3600);
+            data.put("vendorId", vendor.getId());
+            data.put("vendorEmail", vendor.getEmail());
+            data.put("vendorName", vendor.getFullName());
 
             return ResponseEntity.ok(ApiResponseDto.builder()
                     .success(true)
@@ -176,9 +198,15 @@ public class AuthController {
             if (jwtTokenService.validateToken(token, email)) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
+                // Get vendor information
+                VendorsEntity vendor = vendorRepository.findByEmail(email)
+                        .orElseThrow(() -> new RuntimeException("Vendor not found"));
+
                 Map<String, Object> data = new HashMap<>();
                 data.put("valid", true);
                 data.put("email", email);
+                data.put("vendorId", vendor.getId());
+                data.put("vendorName", vendor.getFullName());
                 data.put("authorities", userDetails.getAuthorities());
 
                 return ResponseEntity.ok(ApiResponseDto.builder()
@@ -223,9 +251,15 @@ public class AuthController {
             Date expiration = jwtTokenService.extractExpiration(token);
             Long userId = jwtTokenService.extractUserId(token);
 
+            // Get vendor information
+            VendorsEntity vendor = vendorRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("Vendor not found"));
+
             Map<String, Object> data = new HashMap<>();
             data.put("email", email);
             data.put("userId", userId);
+            data.put("vendorId", vendor.getId());
+            data.put("vendorName", vendor.getFullName());
             data.put("expiration", expiration);
             data.put("expiresIn", jwtTokenService.getTokenExpirationTime(token));
             data.put("isExpiringSoon", jwtTokenService.isTokenExpiringSoon(token, 30)); // 30 minutes
