@@ -6,7 +6,6 @@ import com.example.crave.kitchen.portal.repository.VendorRepository;
 import com.example.crave.kitchen.portal.service.JwtTokenService;
 import com.example.crave.kitchen.portal.service.MenuService;
 import com.example.crave.kitchen.portal.util.TokenDataExtractor;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,17 +20,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/menu")
@@ -47,185 +41,6 @@ public class MenuController extends BaseController {
 
         @Autowired
         private JwtTokenService jwtTokenService;
-
-        // =====================================================
-        // UTILITY METHODS
-        // =====================================================
-
-        /**
-         * Debug endpoint to test token extraction
-         */
-        @GetMapping("/debug/token")
-        public ResponseEntity<ApiResponseDto<Map<String, Object>>> debugToken() {
-                log.info("GET /api/menu/debug/token - Debugging token extraction");
-
-                try {
-                        // Log current authentication
-                        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-                        log.debug("Current authentication: {}", authentication);
-
-                        // Try to extract vendor ID
-                        Long vendorId = tokenDataExtractor.getCurrentVendorId();
-                        String email = tokenDataExtractor.getCurrentUserEmail();
-                        Map<String, Object> allTokenData = tokenDataExtractor.getAllTokenData();
-
-                        Map<String, Object> debugInfo = Map.of(
-                                        "authenticationName",
-                                        authentication != null ? authentication.getName() : "null",
-                                        "isAuthenticated",
-                                        authentication != null ? authentication.isAuthenticated() : false,
-                                        "authorities",
-                                        authentication != null ? authentication.getAuthorities() : "null",
-                                        "vendorId", vendorId,
-                                        "email", email,
-                                        "allTokenData", allTokenData);
-
-                        log.info("Debug info: {}", debugInfo);
-                        return ResponseEntity.ok(ApiResponseDto.<Map<String, Object>>builder()
-                                        .success(true)
-                                        .message("Token debug information")
-                                        .data(debugInfo)
-                                        .build());
-                } catch (Exception e) {
-                        log.error("Error in token debug: {}", e.getMessage(), e);
-                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                        .body(ApiResponseDto.<Map<String, Object>>builder()
-                                                        .success(false)
-                                                        .message("Error debugging token: " + e.getMessage())
-                                                        .build());
-                }
-        }
-
-        /**
-         * Simple test endpoint to verify vendor ID extraction
-         */
-        @GetMapping("/test-vendor-id")
-        public ResponseEntity<ApiResponseDto<Map<String, Object>>> testVendorId() {
-                log.info("GET /api/menu/test-vendor-id - Testing vendor ID extraction");
-
-                try {
-                        // Test token extraction directly
-                        String token = extractTokenFromRequest();
-                        log.info("Token extracted: {}", token != null ? "YES" : "NO");
-
-                        // Test vendor ID extraction
-                        Long vendorId = getCurrentVendorId();
-
-                        // Get authentication info
-                        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-                        String authName = auth != null ? auth.getName() : "null";
-                        boolean isAuthenticated = auth != null && auth.isAuthenticated();
-
-                        Map<String, Object> result = Map.of(
-                                        "tokenFound", token != null,
-                                        "tokenLength", token != null ? token.length() : 0,
-                                        "vendorId", vendorId,
-                                        "authName", authName,
-                                        "isAuthenticated", isAuthenticated,
-                                        "success", vendorId != null,
-                                        "message", vendorId != null ? "Vendor ID extracted successfully"
-                                                        : "Failed to extract vendor ID");
-
-                        log.info("Vendor ID test result: {}", result);
-                        return ResponseEntity.ok(ApiResponseDto.<Map<String, Object>>builder()
-                                        .success(true)
-                                        .message("Vendor ID test completed")
-                                        .data(result)
-                                        .build());
-                } catch (Exception e) {
-                        log.error("Error testing vendor ID: {}", e.getMessage(), e);
-                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                        .body(ApiResponseDto.<Map<String, Object>>builder()
-                                                        .success(false)
-                                                        .message("Error testing vendor ID: " + e.getMessage())
-                                                        .build());
-                }
-        }
-
-        @GetMapping("/test-pagination")
-        public ResponseEntity<ApiResponseDto<Map<String, Object>>> testPagination(
-                        @RequestParam(defaultValue = "0") int page,
-                        @RequestParam(defaultValue = "5") int size) {
-                log.info("=== TEST PAGINATION ENDPOINT ===");
-                log.info("Testing pagination with page: {}, size: {}", page, size);
-
-                try {
-                        Long vendorId = getCurrentVendorId();
-
-                        // Create pageable object
-                        Pageable pageable = PageRequest.of(page, size, Sort.by("displayOrder").ascending());
-
-                        // Test the pagination
-                        Page<MenuCategoryDto> categories = menuService.getAllCategories(vendorId, null, null, pageable);
-
-                        Map<String, Object> result = new HashMap<>();
-                        result.put("vendorId", vendorId);
-                        result.put("page", page);
-                        result.put("size", size);
-                        result.put("totalElements", categories.getTotalElements());
-                        result.put("totalPages", categories.getTotalPages());
-                        result.put("currentPage", categories.getNumber());
-                        result.put("hasNext", categories.hasNext());
-                        result.put("hasPrevious", categories.hasPrevious());
-                        result.put("categoriesCount", categories.getContent().size());
-                        result.put("categories", categories.getContent());
-                        result.put("timestamp", LocalDateTime.now());
-                        result.put("status", "success");
-
-                        log.info("=== SUCCESS ===");
-                        log.info("Pagination test successful - totalElements: {}, totalPages: {}, currentPage: {}",
-                                        categories.getTotalElements(), categories.getTotalPages(),
-                                        categories.getNumber());
-
-                        return ResponseEntity.ok(ApiResponseDto.<Map<String, Object>>builder()
-                                        .success(true)
-                                        .message("Pagination test successful")
-                                        .data(result)
-                                        .build());
-                } catch (Exception e) {
-                        log.error("=== ERROR ===");
-                        log.error("Pagination test failed", e);
-                        log.error("Error type: {}", e.getClass().getSimpleName());
-                        log.error("Error message: {}", e.getMessage());
-
-                        Map<String, Object> result = new HashMap<>();
-                        result.put("error", e.getMessage());
-                        result.put("errorType", e.getClass().getSimpleName());
-                        result.put("timestamp", LocalDateTime.now());
-                        result.put("status", "error");
-
-                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                        .body(ApiResponseDto.<Map<String, Object>>builder()
-                                                        .success(false)
-                                                        .message("Pagination test failed: " + e.getMessage())
-                                                        .data(result)
-                                                        .build());
-                }
-        }
-
-        /**
-         * Extract token from request for debugging
-         */
-        private String extractTokenFromRequest() {
-                try {
-                        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder
-                                        .currentRequestAttributes())
-                                        .getRequest();
-                        String authHeader = request.getHeader("Authorization");
-                        log.info("Authorization header found: {}", authHeader != null);
-                        if (authHeader != null) {
-                                log.info("Authorization header starts with Bearer: {}",
-                                                authHeader.startsWith("Bearer "));
-                        }
-
-                        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                                return authHeader.substring(7);
-                        }
-                } catch (Exception e) {
-                        log.error("Failed to extract token from request: {}", e.getMessage(), e);
-                }
-                return null;
-        }
 
         /**
          * Extract vendor ID from the JWT token (overrides BaseController method)

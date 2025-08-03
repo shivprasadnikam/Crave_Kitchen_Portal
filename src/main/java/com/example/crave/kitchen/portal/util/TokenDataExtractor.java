@@ -33,9 +33,18 @@ public class TokenDataExtractor {
                 token != null ? token.substring(0, Math.min(50, token.length())) + "..." : "null");
 
         if (token != null) {
-            Long vendorId = jwtTokenService.extractVendorId(token);
-            log.debug("Extracted vendor ID from token: {}", vendorId);
-            return vendorId;
+            try {
+                Long vendorId = jwtTokenService.extractVendorId(token);
+                log.debug("Extracted vendor ID from token: {}", vendorId);
+                return vendorId;
+            } catch (io.jsonwebtoken.ExpiredJwtException e) {
+                log.error("JWT token has expired: {}", e.getMessage());
+                log.error("Token expired at: {}, Current time: {}", e.getClaims().getExpiration(), new Date());
+                throw new RuntimeException("JWT token has expired. Please login again to get a new token.", e);
+            } catch (Exception e) {
+                log.error("Error extracting vendor ID from token: {}", e.getMessage());
+                throw new RuntimeException("Failed to extract vendor ID from token: " + e.getMessage(), e);
+            }
         } else {
             log.warn("No token found in request context, trying alternative method");
             // Try alternative method using SecurityContext

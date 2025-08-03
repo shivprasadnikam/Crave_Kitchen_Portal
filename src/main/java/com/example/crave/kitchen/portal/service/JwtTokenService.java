@@ -136,6 +136,7 @@ public class JwtTokenService {
         try {
             return Jwts.parserBuilder()
                     .setSigningKey(getSigningKey())
+                    .setAllowedClockSkewSeconds(30) // Allow 30 seconds clock skew
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
@@ -252,10 +253,11 @@ public class JwtTokenService {
         try {
             Claims claims = extractAllClaims(token);
             logger.debug("Extracted claims: {}", claims);
-            
+
             Object vendorIdObj = claims.get("vendorId");
-            logger.debug("Vendor ID object from claims: {} (type: {})", vendorIdObj, vendorIdObj != null ? vendorIdObj.getClass().getSimpleName() : "null");
-            
+            logger.debug("Vendor ID object from claims: {} (type: {})", vendorIdObj,
+                    vendorIdObj != null ? vendorIdObj.getClass().getSimpleName() : "null");
+
             Long vendorId = claims.get("vendorId", Long.class);
             logger.debug("Extracted vendor ID: {}", vendorId);
             return vendorId;

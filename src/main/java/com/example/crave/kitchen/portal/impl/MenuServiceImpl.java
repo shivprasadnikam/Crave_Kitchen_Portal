@@ -44,26 +44,30 @@ public class MenuServiceImpl implements MenuService {
             List<MenuCategoryEntity> categories;
             long totalElements;
             String filterType = "ALL";
-            
+
             // Calculate pagination parameters
             int pageNumber = pageable.getPageNumber();
             int pageSize = pageable.getPageSize();
             int minRow = pageNumber * pageSize;
             int maxRow = (pageNumber + 1) * pageSize;
-            
+
             log.debug("Pagination parameters - minRow: {}, maxRow: {}, pageSize: {}", minRow, maxRow, pageSize);
-            
+
             if (isActive != null && isFeatured != null) {
-                categories = menuCategoryRepository.findByVendorIdAndIsActiveAndIsFeaturedWithPagination(vendorId, isActive,
+                categories = menuCategoryRepository.findByVendorIdAndIsActiveAndIsFeaturedWithPagination(vendorId,
+                        isActive,
                         isFeatured, minRow, maxRow);
-                totalElements = menuCategoryRepository.countByVendorIdAndIsActiveAndIsFeaturedNative(vendorId, isActive, isFeatured);
+                totalElements = menuCategoryRepository.countByVendorIdAndIsActiveAndIsFeaturedNative(vendorId, isActive,
+                        isFeatured);
                 filterType = "ACTIVE_AND_FEATURED";
             } else if (isActive != null) {
-                categories = menuCategoryRepository.findByVendorIdAndIsActiveWithPagination(vendorId, isActive, minRow, maxRow);
+                categories = menuCategoryRepository.findByVendorIdAndIsActiveWithPagination(vendorId, isActive, minRow,
+                        maxRow);
                 totalElements = menuCategoryRepository.countByVendorIdAndIsActiveNative(vendorId, isActive);
                 filterType = "ACTIVE_ONLY";
             } else if (isFeatured != null) {
-                categories = menuCategoryRepository.findByVendorIdAndIsFeaturedWithPagination(vendorId, isFeatured, minRow, maxRow);
+                categories = menuCategoryRepository.findByVendorIdAndIsFeaturedWithPagination(vendorId, isFeatured,
+                        minRow, maxRow);
                 totalElements = menuCategoryRepository.countByVendorIdAndIsFeaturedNative(vendorId, isFeatured);
                 filterType = "FEATURED_ONLY";
             } else {
@@ -73,20 +77,20 @@ public class MenuServiceImpl implements MenuService {
             }
 
             log.debug("Database query executed with filter type: {}", filterType);
-            
+
             // Convert to DTOs
             List<MenuCategoryDto> categoryDtos = categories.stream()
                     .map(this::convertToCategoryDto)
                     .collect(Collectors.toList());
-            
+
             // Create Page object manually
             Page<MenuCategoryDto> result = new PageImpl<>(categoryDtos, pageable, totalElements);
-            
+
             log.info("=== SUCCESS ===");
-            log.info("Retrieved {} categories for vendorId: {} (Page {} of {})", 
+            log.info("Retrieved {} categories for vendorId: {} (Page {} of {})",
                     result.getTotalElements(), vendorId, pageable.getPageNumber() + 1, result.getTotalPages());
             log.info("Categories in current page: {}", result.getContent().size());
-            
+
             return result;
         } catch (Exception e) {
             log.error("=== ERROR ===");
@@ -120,7 +124,10 @@ public class MenuServiceImpl implements MenuService {
         log.info("=== MENU SERVICE - CREATE CATEGORY ===");
         log.info("Creating category - Name: '{}', VendorId: {}", requestDto.getName(), vendorId);
         log.info("Category details - Description: '{}', DisplayOrder: {}, IsActive: {}, IsFeatured: {}",
-                requestDto.getDescription() != null ? requestDto.getDescription().substring(0, Math.min(50, requestDto.getDescription().length())) + "..." : "null",
+                requestDto.getDescription() != null
+                        ? requestDto.getDescription().substring(0, Math.min(50, requestDto.getDescription().length()))
+                                + "..."
+                        : "null",
                 requestDto.getDisplayOrder(), requestDto.getIsActive(), requestDto.getIsFeatured());
 
         try {
@@ -137,9 +144,9 @@ public class MenuServiceImpl implements MenuService {
 
             log.debug("Category entity prepared for persistence");
             MenuCategoryEntity savedCategory = menuCategoryRepository.save(category);
-            
+
             log.info("=== SUCCESS ===");
-            log.info("Category created successfully - ID: {}, Name: '{}', VendorId: {}", 
+            log.info("Category created successfully - ID: {}, Name: '{}', VendorId: {}",
                     savedCategory.getId(), savedCategory.getName(), savedCategory.getVendorId());
             log.info("Category created at: {}", savedCategory.getCreatedAt());
 
@@ -233,15 +240,35 @@ public class MenuServiceImpl implements MenuService {
                 isSpicy, minPrice, maxPrice, searchTerm, pageable.getPageNumber(), pageable.getPageSize());
 
         try {
-            Page<MenuItemEntity> items;
+            List<MenuItemEntity> items;
+            long totalElements;
+
+            // Calculate pagination parameters for Oracle ROWNUM
+            int pageNumber = pageable.getPageNumber();
+            int pageSize = pageable.getPageSize();
+            int minRow = pageNumber * pageSize;
+            int maxRow = (pageNumber + 1) * pageSize;
+
+            log.debug("Oracle pagination parameters - minRow: {}, maxRow: {}, pageSize: {}", minRow, maxRow, pageSize);
+
             if (searchTerm != null && !searchTerm.trim().isEmpty()) {
-                items = menuItemRepository.findByVendorIdAndSearchTerm(vendorId, searchTerm.trim(), pageable);
+                items = menuItemRepository.findByVendorIdAndSearchTermNative(vendorId, searchTerm.trim(), minRow,
+                        maxRow);
+                totalElements = menuItemRepository.countByVendorIdAndSearchTermNative(vendorId, searchTerm.trim());
             } else {
-                items = menuItemRepository.findMenuItemsWithFilters(vendorId, categoryId, isVegetarian,
-                        isVegan, isGlutenFree, isSpicy, minPrice, maxPrice, searchTerm, pageable);
+                items = menuItemRepository.findMenuItemsWithFiltersNative(vendorId, categoryId, isVegetarian,
+                        isVegan, isGlutenFree, isSpicy, minPrice, maxPrice, searchTerm, minRow, maxRow);
+                totalElements = menuItemRepository.countMenuItemsWithFiltersNative(vendorId, categoryId, isVegetarian,
+                        isVegan, isGlutenFree, isSpicy, minPrice, maxPrice, searchTerm);
             }
 
-            Page<MenuItemDto> result = items.map(this::convertToMenuItemDto);
+            // Convert to DTOs
+            List<MenuItemDto> itemDtos = items.stream()
+                    .map(this::convertToMenuItemDto)
+                    .collect(Collectors.toList());
+
+            // Create Page object manually
+            Page<MenuItemDto> result = new PageImpl<>(itemDtos, pageable, totalElements);
             log.info("Successfully fetched {} menu items for vendorId: {}", result.getTotalElements(), vendorId);
             return result;
         } catch (Exception e) {
@@ -272,12 +299,13 @@ public class MenuServiceImpl implements MenuService {
     @Override
     public MenuItemDto createMenuItem(Long vendorId, CreateMenuItemRequestDto requestDto) {
         log.info("=== MENU SERVICE - CREATE MENU ITEM ===");
-        log.info("Creating menu item - Name: '{}', VendorId: {}, CategoryId: {}", 
+        log.info("Creating menu item - Name: '{}', VendorId: {}, CategoryId: {}",
                 requestDto.getName(), vendorId, requestDto.getCategoryId());
-        log.info("Item details - Price: {}, IsAvailable: {}, IsFeatured: {}", 
+        log.info("Item details - Price: {}, IsAvailable: {}, IsFeatured: {}",
                 requestDto.getPrice(), requestDto.getIsAvailable(), requestDto.getIsFeatured());
-        log.info("Dietary info - Vegetarian: {}, Vegan: {}, GlutenFree: {}, Spicy: {}", 
-                requestDto.getIsVegetarian(), requestDto.getIsVegan(), requestDto.getIsGlutenFree(), requestDto.getIsSpicy());
+        log.info("Dietary info - Vegetarian: {}, Vegan: {}, GlutenFree: {}, Spicy: {}",
+                requestDto.getIsVegetarian(), requestDto.getIsVegan(), requestDto.getIsGlutenFree(),
+                requestDto.getIsSpicy());
 
         try {
             // Validate category exists and belongs to the vendor
@@ -321,9 +349,9 @@ public class MenuServiceImpl implements MenuService {
 
             log.debug("Menu item entity prepared for persistence");
             MenuItemEntity savedItem = menuItemRepository.save(item);
-            
+
             log.info("=== SUCCESS ===");
-            log.info("Menu item created successfully - ID: {}, Name: '{}', VendorId: {}, CategoryId: {}", 
+            log.info("Menu item created successfully - ID: {}, Name: '{}', VendorId: {}, CategoryId: {}",
                     savedItem.getId(), savedItem.getName(), savedItem.getVendorId(), savedItem.getCategoryId());
             log.info("Item created at: {}", savedItem.getCreatedAt());
 
@@ -426,8 +454,26 @@ public class MenuServiceImpl implements MenuService {
                 vendorId, searchTerm, pageable.getPageNumber(), pageable.getPageSize());
 
         try {
-            Page<MenuItemEntity> items = menuItemRepository.findByVendorIdAndSearchTerm(vendorId, searchTerm, pageable);
-            Page<MenuItemDto> result = items.map(this::convertToMenuItemDto);
+            // Calculate pagination parameters for Oracle ROWNUM
+            int pageNumber = pageable.getPageNumber();
+            int pageSize = pageable.getPageSize();
+            int minRow = pageNumber * pageSize;
+            int maxRow = (pageNumber + 1) * pageSize;
+
+            log.debug("Oracle pagination parameters for search - minRow: {}, maxRow: {}, pageSize: {}", minRow, maxRow,
+                    pageSize);
+
+            List<MenuItemEntity> items = menuItemRepository.findByVendorIdAndSearchTermNative(vendorId, searchTerm,
+                    minRow, maxRow);
+            long totalElements = menuItemRepository.countByVendorIdAndSearchTermNative(vendorId, searchTerm);
+
+            // Convert to DTOs
+            List<MenuItemDto> itemDtos = items.stream()
+                    .map(this::convertToMenuItemDto)
+                    .collect(Collectors.toList());
+
+            // Create Page object manually
+            Page<MenuItemDto> result = new PageImpl<>(itemDtos, pageable, totalElements);
             log.info("Search completed successfully. Found {} items for search term: '{}'",
                     result.getTotalElements(), searchTerm);
             return result;
@@ -697,9 +743,26 @@ public class MenuServiceImpl implements MenuService {
                 vendorId, pageable.getPageNumber(), pageable.getPageSize());
 
         try {
-            Page<MenuItemEntity> items = menuItemRepository
-                    .findTopByVendorIdAndIsFeaturedOrderByDisplayOrderAsc(vendorId, true, pageable);
-            Page<MenuItemDto> result = items.map(this::convertToMenuItemDto);
+            // Calculate pagination parameters for Oracle ROWNUM
+            int pageNumber = pageable.getPageNumber();
+            int pageSize = pageable.getPageSize();
+            int minRow = pageNumber * pageSize;
+            int maxRow = (pageNumber + 1) * pageSize;
+
+            log.debug("Oracle pagination parameters for featured items - minRow: {}, maxRow: {}, pageSize: {}", minRow,
+                    maxRow, pageSize);
+
+            List<MenuItemEntity> items = menuItemRepository
+                    .findTopByVendorIdAndIsFeaturedOrderByDisplayOrderAscNative(vendorId, true, minRow, maxRow);
+            long totalElements = menuItemRepository.countByVendorIdAndIsFeaturedNative(vendorId, true);
+
+            // Convert to DTOs
+            List<MenuItemDto> itemDtos = items.stream()
+                    .map(this::convertToMenuItemDto)
+                    .collect(Collectors.toList());
+
+            // Create Page object manually
+            Page<MenuItemDto> result = new PageImpl<>(itemDtos, pageable, totalElements);
             log.info("Successfully fetched {} featured items for vendor ID: {}", result.getTotalElements(), vendorId);
             return result;
         } catch (Exception e) {
@@ -714,26 +777,46 @@ public class MenuServiceImpl implements MenuService {
                 vendorId, preference, pageable.getPageNumber(), pageable.getPageSize());
 
         try {
-            Page<MenuItemEntity> items;
+            // Calculate pagination parameters for Oracle ROWNUM
+            int pageNumber = pageable.getPageNumber();
+            int pageSize = pageable.getPageSize();
+            int minRow = pageNumber * pageSize;
+            int maxRow = (pageNumber + 1) * pageSize;
+
+            log.debug("Oracle pagination parameters for dietary preference - minRow: {}, maxRow: {}, pageSize: {}",
+                    minRow, maxRow, pageSize);
+
+            List<MenuItemEntity> items;
+            long totalElements;
             switch (preference.toUpperCase()) {
                 case "VEGETARIAN":
-                    items = menuItemRepository.findByVendorIdAndIsVegetarian(vendorId, true, pageable);
+                    items = menuItemRepository.findByVendorIdAndIsVegetarianNative(vendorId, true, minRow, maxRow);
+                    totalElements = menuItemRepository.countByVendorIdAndIsVegetarianNative(vendorId, true);
                     break;
                 case "VEGAN":
-                    items = menuItemRepository.findByVendorIdAndIsVegan(vendorId, true, pageable);
+                    items = menuItemRepository.findByVendorIdAndIsVeganNative(vendorId, true, minRow, maxRow);
+                    totalElements = menuItemRepository.countByVendorIdAndIsVeganNative(vendorId, true);
                     break;
                 case "GLUTEN_FREE":
-                    items = menuItemRepository.findByVendorIdAndIsGlutenFree(vendorId, true, pageable);
+                    items = menuItemRepository.findByVendorIdAndIsGlutenFreeNative(vendorId, true, minRow, maxRow);
+                    totalElements = menuItemRepository.countByVendorIdAndIsGlutenFreeNative(vendorId, true);
                     break;
                 case "SPICY":
-                    items = menuItemRepository.findByVendorIdAndIsSpicy(vendorId, true, pageable);
+                    items = menuItemRepository.findByVendorIdAndIsSpicyNative(vendorId, true, minRow, maxRow);
+                    totalElements = menuItemRepository.countByVendorIdAndIsSpicyNative(vendorId, true);
                     break;
                 default:
                     log.warn("Invalid dietary preference: {}", preference);
                     throw new IllegalArgumentException("Invalid dietary preference: " + preference);
             }
 
-            Page<MenuItemDto> result = items.map(this::convertToMenuItemDto);
+            // Convert to DTOs
+            List<MenuItemDto> itemDtos = items.stream()
+                    .map(this::convertToMenuItemDto)
+                    .collect(Collectors.toList());
+
+            // Create Page object manually
+            Page<MenuItemDto> result = new PageImpl<>(itemDtos, pageable, totalElements);
             log.info("Successfully fetched {} items for dietary preference: {} for vendor ID: {}",
                     result.getTotalElements(), preference, vendorId);
             return result;

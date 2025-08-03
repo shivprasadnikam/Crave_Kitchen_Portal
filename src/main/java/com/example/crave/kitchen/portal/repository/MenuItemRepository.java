@@ -25,21 +25,50 @@ public interface MenuItemRepository extends JpaRepository<MenuItemEntity, Long> 
         List<MenuItemEntity> findByVendorIdAndIsFeaturedAndIsAvailableOrderByDisplayOrderAsc(Long vendorId,
                         Boolean isFeatured, Boolean isAvailable);
 
-        Page<MenuItemEntity> findByVendorIdAndIsAvailable(Long vendorId, Boolean isAvailable, Pageable pageable);
+        @Query(value = "SELECT * FROM (" +
+                        "SELECT a.*, ROWNUM rnum FROM (" +
+                        "SELECT m.* FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_available = :isAvailable "
+                        +
+                        "ORDER BY m.display_order ASC" +
+                        ") a WHERE ROWNUM <= :maxRow" +
+                        ") WHERE rnum > :minRow", countQuery = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_available = :isAvailable", nativeQuery = true)
+        List<MenuItemEntity> findByVendorIdAndIsAvailableNative(@Param("vendorId") Long vendorId,
+                        @Param("isAvailable") Boolean isAvailable,
+                        @Param("minRow") int minRow,
+                        @Param("maxRow") int maxRow);
 
-        // Advanced filtering with pagination
-        @Query("SELECT m FROM MenuItemEntity m WHERE m.vendorId = :vendorId AND m.isAvailable = true AND " +
-                        "(:categoryId IS NULL OR m.categoryId = :categoryId) AND " +
-                        "(:isVegetarian IS NULL OR m.isVegetarian = :isVegetarian) AND " +
-                        "(:isVegan IS NULL OR m.isVegan = :isVegan) AND " +
-                        "(:isGlutenFree IS NULL OR m.isGlutenFree = :isGlutenFree) AND " +
-                        "(:isSpicy IS NULL OR m.isSpicy = :isSpicy) AND " +
+        @Query(value = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_available = :isAvailable", nativeQuery = true)
+        long countByVendorIdAndIsAvailableNative(@Param("vendorId") Long vendorId,
+                        @Param("isAvailable") Boolean isAvailable);
+
+        // Advanced filtering with pagination using native SQL for Oracle compatibility
+        @Query(value = "SELECT * FROM (" +
+                        "SELECT a.*, ROWNUM rnum FROM (" +
+                        "SELECT m.* FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_available = 1 AND " +
+                        "(:categoryId IS NULL OR m.category_id = :categoryId) AND " +
+                        "(:isVegetarian IS NULL OR m.is_vegetarian = :isVegetarian) AND " +
+                        "(:isVegan IS NULL OR m.is_vegan = :isVegan) AND " +
+                        "(:isGlutenFree IS NULL OR m.is_gluten_free = :isGlutenFree) AND " +
+                        "(:isSpicy IS NULL OR m.is_spicy = :isSpicy) AND " +
                         "(:minPrice IS NULL OR m.price >= :minPrice) AND " +
                         "(:maxPrice IS NULL OR m.price <= :maxPrice) AND " +
-                        "(:searchTerm IS NULL OR LOWER(m.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-                        "LOWER(m.description) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) " +
-                        "ORDER BY m.displayOrder ASC")
-        Page<MenuItemEntity> findMenuItemsWithFilters(
+                        "(:searchTerm IS NULL OR LOWER(m.name) LIKE LOWER('%' || :searchTerm || '%') OR " +
+                        "LOWER(m.description) LIKE LOWER('%' || :searchTerm || '%')) " +
+                        "ORDER BY m.display_order ASC" +
+                        ") a WHERE ROWNUM <= :maxRow" +
+                        ") WHERE rnum > :minRow", countQuery = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_available = 1 AND "
+                                        +
+                                        "(:categoryId IS NULL OR m.category_id = :categoryId) AND " +
+                                        "(:isVegetarian IS NULL OR m.is_vegetarian = :isVegetarian) AND " +
+                                        "(:isVegan IS NULL OR m.is_vegan = :isVegan) AND " +
+                                        "(:isGlutenFree IS NULL OR m.is_gluten_free = :isGlutenFree) AND " +
+                                        "(:isSpicy IS NULL OR m.is_spicy = :isSpicy) AND " +
+                                        "(:minPrice IS NULL OR m.price >= :minPrice) AND " +
+                                        "(:maxPrice IS NULL OR m.price <= :maxPrice) AND " +
+                                        "(:searchTerm IS NULL OR LOWER(m.name) LIKE LOWER('%' || :searchTerm || '%') OR "
+                                        +
+                                        "LOWER(m.description) LIKE LOWER('%' || :searchTerm || '%'))", nativeQuery = true)
+        List<MenuItemEntity> findMenuItemsWithFiltersNative(
                         @Param("vendorId") Long vendorId,
                         @Param("categoryId") Long categoryId,
                         @Param("isVegetarian") Boolean isVegetarian,
@@ -49,17 +78,55 @@ public interface MenuItemRepository extends JpaRepository<MenuItemEntity, Long> 
                         @Param("minPrice") BigDecimal minPrice,
                         @Param("maxPrice") BigDecimal maxPrice,
                         @Param("searchTerm") String searchTerm,
-                        Pageable pageable);
+                        @Param("minRow") int minRow,
+                        @Param("maxRow") int maxRow);
 
-        // Search functionality
-        @Query("SELECT m FROM MenuItemEntity m WHERE m.vendorId = :vendorId AND " +
-                        "(LOWER(m.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-                        "LOWER(m.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-                        "LOWER(m.ingredients) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) " +
-                        "ORDER BY m.displayOrder ASC")
-        Page<MenuItemEntity> findByVendorIdAndSearchTerm(@Param("vendorId") Long vendorId,
+        @Query(value = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_available = 1 AND " +
+                        "(:categoryId IS NULL OR m.category_id = :categoryId) AND " +
+                        "(:isVegetarian IS NULL OR m.is_vegetarian = :isVegetarian) AND " +
+                        "(:isVegan IS NULL OR m.is_vegan = :isVegan) AND " +
+                        "(:isGlutenFree IS NULL OR m.is_gluten_free = :isGlutenFree) AND " +
+                        "(:isSpicy IS NULL OR m.is_spicy = :isSpicy) AND " +
+                        "(:minPrice IS NULL OR m.price >= :minPrice) AND " +
+                        "(:maxPrice IS NULL OR m.price <= :maxPrice) AND " +
+                        "(:searchTerm IS NULL OR LOWER(m.name) LIKE LOWER('%' || :searchTerm || '%') OR " +
+                        "LOWER(m.description) LIKE LOWER('%' || :searchTerm || '%'))", nativeQuery = true)
+        long countMenuItemsWithFiltersNative(
+                        @Param("vendorId") Long vendorId,
+                        @Param("categoryId") Long categoryId,
+                        @Param("isVegetarian") Boolean isVegetarian,
+                        @Param("isVegan") Boolean isVegan,
+                        @Param("isGlutenFree") Boolean isGlutenFree,
+                        @Param("isSpicy") Boolean isSpicy,
+                        @Param("minPrice") BigDecimal minPrice,
+                        @Param("maxPrice") BigDecimal maxPrice,
+                        @Param("searchTerm") String searchTerm);
+
+        // Search functionality using native SQL for Oracle compatibility
+        @Query(value = "SELECT * FROM (" +
+                        "SELECT a.*, ROWNUM rnum FROM (" +
+                        "SELECT m.* FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND " +
+                        "(LOWER(m.name) LIKE LOWER('%' || :searchTerm || '%') OR " +
+                        "LOWER(m.description) LIKE LOWER('%' || :searchTerm || '%') OR " +
+                        "LOWER(m.ingredients) LIKE LOWER('%' || :searchTerm || '%')) " +
+                        "ORDER BY m.display_order ASC" +
+                        ") a WHERE ROWNUM <= :maxRow" +
+                        ") WHERE rnum > :minRow", countQuery = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND "
+                                        +
+                                        "(LOWER(m.name) LIKE LOWER('%' || :searchTerm || '%') OR " +
+                                        "LOWER(m.description) LIKE LOWER('%' || :searchTerm || '%') OR " +
+                                        "LOWER(m.ingredients) LIKE LOWER('%' || :searchTerm || '%'))", nativeQuery = true)
+        List<MenuItemEntity> findByVendorIdAndSearchTermNative(@Param("vendorId") Long vendorId,
                         @Param("searchTerm") String searchTerm,
-                        Pageable pageable);
+                        @Param("minRow") int minRow,
+                        @Param("maxRow") int maxRow);
+
+        @Query(value = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND " +
+                        "(LOWER(m.name) LIKE LOWER('%' || :searchTerm || '%') OR " +
+                        "LOWER(m.description) LIKE LOWER('%' || :searchTerm || '%') OR " +
+                        "LOWER(m.ingredients) LIKE LOWER('%' || :searchTerm || '%'))", nativeQuery = true)
+        long countByVendorIdAndSearchTermNative(@Param("vendorId") Long vendorId,
+                        @Param("searchTerm") String searchTerm);
 
         // Validation methods
         Optional<MenuItemEntity> findByVendorIdAndNameAndIsAvailable(Long vendorId, String name, Boolean isAvailable);
@@ -102,21 +169,99 @@ public interface MenuItemRepository extends JpaRepository<MenuItemEntity, Long> 
         List<MenuItemEntity> findByVendorIdAndIsAvailableAndIsGlutenFreeOrderByDisplayOrderAsc(Long vendorId,
                         Boolean isAvailable, Boolean isGlutenFree);
 
-        // Pagination support for dietary preferences
-        Page<MenuItemEntity> findByVendorIdAndIsVegetarian(Long vendorId, Boolean isVegetarian, Pageable pageable);
+        // Pagination support for dietary preferences using native SQL for Oracle
+        // compatibility
+        @Query(value = "SELECT * FROM (" +
+                        "SELECT a.*, ROWNUM rnum FROM (" +
+                        "SELECT m.* FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_vegetarian = :isVegetarian "
+                        +
+                        "ORDER BY m.display_order ASC" +
+                        ") a WHERE ROWNUM <= :maxRow" +
+                        ") WHERE rnum > :minRow", countQuery = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_vegetarian = :isVegetarian", nativeQuery = true)
+        List<MenuItemEntity> findByVendorIdAndIsVegetarianNative(@Param("vendorId") Long vendorId,
+                        @Param("isVegetarian") Boolean isVegetarian,
+                        @Param("minRow") int minRow,
+                        @Param("maxRow") int maxRow);
 
-        Page<MenuItemEntity> findByVendorIdAndIsVegan(Long vendorId, Boolean isVegan, Pageable pageable);
+        @Query(value = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_vegetarian = :isVegetarian", nativeQuery = true)
+        long countByVendorIdAndIsVegetarianNative(@Param("vendorId") Long vendorId,
+                        @Param("isVegetarian") Boolean isVegetarian);
 
-        Page<MenuItemEntity> findByVendorIdAndIsGlutenFree(Long vendorId, Boolean isGlutenFree, Pageable pageable);
+        @Query(value = "SELECT * FROM (" +
+                        "SELECT a.*, ROWNUM rnum FROM (" +
+                        "SELECT m.* FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_vegan = :isVegan " +
+                        "ORDER BY m.display_order ASC" +
+                        ") a WHERE ROWNUM <= :maxRow" +
+                        ") WHERE rnum > :minRow", countQuery = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_vegan = :isVegan", nativeQuery = true)
+        List<MenuItemEntity> findByVendorIdAndIsVeganNative(@Param("vendorId") Long vendorId,
+                        @Param("isVegan") Boolean isVegan,
+                        @Param("minRow") int minRow,
+                        @Param("maxRow") int maxRow);
 
-        Page<MenuItemEntity> findByVendorIdAndIsSpicy(Long vendorId, Boolean isSpicy, Pageable pageable);
+        @Query(value = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_vegan = :isVegan", nativeQuery = true)
+        long countByVendorIdAndIsVeganNative(@Param("vendorId") Long vendorId, @Param("isVegan") Boolean isVegan);
 
-        // Featured items with pagination
-        List<MenuItemEntity> findTop5ByVendorIdOrderByCreatedAtDesc(Long vendorId);
+        @Query(value = "SELECT * FROM (" +
+                        "SELECT a.*, ROWNUM rnum FROM (" +
+                        "SELECT m.* FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_gluten_free = :isGlutenFree "
+                        +
+                        "ORDER BY m.display_order ASC" +
+                        ") a WHERE ROWNUM <= :maxRow" +
+                        ") WHERE rnum > :minRow", countQuery = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_gluten_free = :isGlutenFree", nativeQuery = true)
+        List<MenuItemEntity> findByVendorIdAndIsGlutenFreeNative(@Param("vendorId") Long vendorId,
+                        @Param("isGlutenFree") Boolean isGlutenFree,
+                        @Param("minRow") int minRow,
+                        @Param("maxRow") int maxRow);
 
-        List<MenuItemEntity> findTop5ByVendorIdAndIsFeaturedOrderByDisplayOrderAsc(Long vendorId, Boolean isFeatured);
+        @Query(value = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_gluten_free = :isGlutenFree", nativeQuery = true)
+        long countByVendorIdAndIsGlutenFreeNative(@Param("vendorId") Long vendorId,
+                        @Param("isGlutenFree") Boolean isGlutenFree);
 
-        @Query("SELECT m FROM MenuItemEntity m WHERE m.vendorId = :vendorId AND m.isFeatured = :isFeatured ORDER BY m.displayOrder ASC")
-        Page<MenuItemEntity> findTopByVendorIdAndIsFeaturedOrderByDisplayOrderAsc(@Param("vendorId") Long vendorId,
-                        @Param("isFeatured") Boolean isFeatured, Pageable pageable);
+        @Query(value = "SELECT * FROM (" +
+                        "SELECT a.*, ROWNUM rnum FROM (" +
+                        "SELECT m.* FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_spicy = :isSpicy " +
+                        "ORDER BY m.display_order ASC" +
+                        ") a WHERE ROWNUM <= :maxRow" +
+                        ") WHERE rnum > :minRow", countQuery = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_spicy = :isSpicy", nativeQuery = true)
+        List<MenuItemEntity> findByVendorIdAndIsSpicyNative(@Param("vendorId") Long vendorId,
+                        @Param("isSpicy") Boolean isSpicy,
+                        @Param("minRow") int minRow,
+                        @Param("maxRow") int maxRow);
+
+        @Query(value = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_spicy = :isSpicy", nativeQuery = true)
+        long countByVendorIdAndIsSpicyNative(@Param("vendorId") Long vendorId, @Param("isSpicy") Boolean isSpicy);
+
+        // Featured items with pagination using native SQL for Oracle compatibility
+        @Query(value = "SELECT * FROM (" +
+                        "SELECT a.*, ROWNUM rnum FROM (" +
+                        "SELECT m.* FROM ck_menu_items m WHERE m.vendor_id = :vendorId " +
+                        "ORDER BY m.created_at DESC" +
+                        ") a WHERE ROWNUM <= 5" +
+                        ") WHERE rnum > 0", nativeQuery = true)
+        List<MenuItemEntity> findTop5ByVendorIdOrderByCreatedAtDesc(@Param("vendorId") Long vendorId);
+
+        @Query(value = "SELECT * FROM (" +
+                        "SELECT a.*, ROWNUM rnum FROM (" +
+                        "SELECT m.* FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_featured = :isFeatured " +
+                        "ORDER BY m.display_order ASC" +
+                        ") a WHERE ROWNUM <= 5" +
+                        ") WHERE rnum > 0", nativeQuery = true)
+        List<MenuItemEntity> findTop5ByVendorIdAndIsFeaturedOrderByDisplayOrderAsc(@Param("vendorId") Long vendorId, @Param("isFeatured") Boolean isFeatured);
+
+        @Query(value = "SELECT * FROM (" +
+                        "SELECT a.*, ROWNUM rnum FROM (" +
+                        "SELECT m.* FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_featured = :isFeatured "
+                        +
+                        "ORDER BY m.display_order ASC" +
+                        ") a WHERE ROWNUM <= :maxRow" +
+                        ") WHERE rnum > :minRow", countQuery = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_featured = :isFeatured", nativeQuery = true)
+        List<MenuItemEntity> findTopByVendorIdAndIsFeaturedOrderByDisplayOrderAscNative(
+                        @Param("vendorId") Long vendorId,
+                        @Param("isFeatured") Boolean isFeatured,
+                        @Param("minRow") int minRow,
+                        @Param("maxRow") int maxRow);
+
+        @Query(value = "SELECT COUNT(*) FROM ck_menu_items m WHERE m.vendor_id = :vendorId AND m.is_featured = :isFeatured", nativeQuery = true)
+        long countByVendorIdAndIsFeaturedNative(@Param("vendorId") Long vendorId,
+                        @Param("isFeatured") Boolean isFeatured);
 }
