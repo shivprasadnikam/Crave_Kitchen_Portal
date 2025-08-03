@@ -19,7 +19,8 @@ import java.time.LocalTime;
 public class MenuItemAvailabilityEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "menu_item_availability_seq")
+    @SequenceGenerator(name = "menu_item_availability_seq", sequenceName = "menu_item_availability_seq", allocationSize = 1)
     private Long id;
 
     @Column(name = "menu_item_id", nullable = false)

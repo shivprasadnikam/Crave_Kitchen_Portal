@@ -17,7 +17,8 @@ import java.time.LocalDateTime;
 public class MenuCategoryEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "menu_category_seq")
+    @SequenceGenerator(name = "menu_category_seq", sequenceName = "menu_category_seq", allocationSize = 1)
     private Long id;
 
     @Column(name = "vendor_id", nullable = false)

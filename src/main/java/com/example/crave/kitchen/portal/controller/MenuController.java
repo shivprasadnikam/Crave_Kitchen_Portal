@@ -6,7 +6,6 @@ import com.example.crave.kitchen.portal.repository.VendorRepository;
 import com.example.crave.kitchen.portal.service.JwtTokenService;
 import com.example.crave.kitchen.portal.service.MenuService;
 import com.example.crave.kitchen.portal.util.TokenDataExtractor;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,22 +20,19 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/menu")
 @RequiredArgsConstructor
 @Slf4j
 @Validated
-public class MenuController {
+public class MenuController extends BaseController {
 
         private final MenuService menuService;
 
@@ -46,131 +42,11 @@ public class MenuController {
         @Autowired
         private JwtTokenService jwtTokenService;
 
-        @Autowired
-        private TokenDataExtractor tokenDataExtractor;
-
-        // =====================================================
-        // UTILITY METHODS
-        // =====================================================
-
         /**
-         * Debug endpoint to test token extraction
+         * Extract vendor ID from the JWT token (overrides BaseController method)
          */
-        @GetMapping("/debug/token")
-        public ResponseEntity<ApiResponseDto<Map<String, Object>>> debugToken() {
-                log.info("GET /api/menu/debug/token - Debugging token extraction");
-
-                try {
-                        // Log current authentication
-                        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-                        log.debug("Current authentication: {}", authentication);
-
-                        // Try to extract vendor ID
-                        Long vendorId = tokenDataExtractor.getCurrentVendorId();
-                        String email = tokenDataExtractor.getCurrentUserEmail();
-                        Map<String, Object> allTokenData = tokenDataExtractor.getAllTokenData();
-
-                        Map<String, Object> debugInfo = Map.of(
-                                        "authenticationName",
-                                        authentication != null ? authentication.getName() : "null",
-                                        "isAuthenticated",
-                                        authentication != null ? authentication.isAuthenticated() : false,
-                                        "authorities",
-                                        authentication != null ? authentication.getAuthorities() : "null",
-                                        "vendorId", vendorId,
-                                        "email", email,
-                                        "allTokenData", allTokenData);
-
-                        log.info("Debug info: {}", debugInfo);
-                        return ResponseEntity.ok(ApiResponseDto.<Map<String, Object>>builder()
-                                        .success(true)
-                                        .message("Token debug information")
-                                        .data(debugInfo)
-                                        .build());
-                } catch (Exception e) {
-                        log.error("Error in token debug: {}", e.getMessage(), e);
-                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                        .body(ApiResponseDto.<Map<String, Object>>builder()
-                                                        .success(false)
-                                                        .message("Error debugging token: " + e.getMessage())
-                                                        .build());
-                }
-        }
-
-        /**
-         * Simple test endpoint to verify vendor ID extraction
-         */
-        @GetMapping("/test-vendor-id")
-        public ResponseEntity<ApiResponseDto<Map<String, Object>>> testVendorId() {
-                log.info("GET /api/menu/test-vendor-id - Testing vendor ID extraction");
-
-                try {
-                        // Test token extraction directly
-                        String token = extractTokenFromRequest();
-                        log.info("Token extracted: {}", token != null ? "YES" : "NO");
-
-                        // Test vendor ID extraction
-                        Long vendorId = getCurrentVendorId();
-
-                        // Get authentication info
-                        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-                        String authName = auth != null ? auth.getName() : "null";
-                        boolean isAuthenticated = auth != null && auth.isAuthenticated();
-
-                        Map<String, Object> result = Map.of(
-                                        "tokenFound", token != null,
-                                        "tokenLength", token != null ? token.length() : 0,
-                                        "vendorId", vendorId,
-                                        "authName", authName,
-                                        "isAuthenticated", isAuthenticated,
-                                        "success", vendorId != null,
-                                        "message", vendorId != null ? "Vendor ID extracted successfully"
-                                                        : "Failed to extract vendor ID");
-
-                        log.info("Vendor ID test result: {}", result);
-                        return ResponseEntity.ok(ApiResponseDto.<Map<String, Object>>builder()
-                                        .success(true)
-                                        .message("Vendor ID test completed")
-                                        .data(result)
-                                        .build());
-                } catch (Exception e) {
-                        log.error("Error testing vendor ID: {}", e.getMessage(), e);
-                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                        .body(ApiResponseDto.<Map<String, Object>>builder()
-                                                        .success(false)
-                                                        .message("Error testing vendor ID: " + e.getMessage())
-                                                        .build());
-                }
-        }
-
-        /**
-         * Extract token from request for debugging
-         */
-        private String extractTokenFromRequest() {
-                try {
-                        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder
-                                        .currentRequestAttributes())
-                                        .getRequest();
-                        String authHeader = request.getHeader("Authorization");
-                        log.info("Authorization header found: {}", authHeader != null);
-                        if (authHeader != null) {
-                                log.info("Authorization header starts with Bearer: {}",
-                                                authHeader.startsWith("Bearer "));
-                        }
-
-                        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                                return authHeader.substring(7);
-                        }
-                } catch (Exception e) {
-                        log.error("Failed to extract token from request: {}", e.getMessage(), e);
-                }
-                return null;
-        }
-
-        /**
-         * Extract vendor ID from the JWT token
-         */
-        private Long getCurrentVendorId() {
+        @Override
+        protected Long getCurrentVendorId() {
                 // Use the utility class to extract vendor ID from token
                 Long vendorId = tokenDataExtractor.getCurrentVendorId();
                 if (vendorId != null) {
@@ -217,8 +93,10 @@ public class MenuController {
                         @RequestParam(defaultValue = "displayOrder") String sortBy,
                         @RequestParam(defaultValue = "asc") String sortDir) {
 
-                log.info("GET /api/menu/categories - vendorId: {}, isActive: {}, isFeatured: {}, page: {}, size: {}, sortBy: {}, sortDir: {}",
+                log.info("=== MENU CATEGORIES - GET ALL ===");
+                log.info("Request Parameters - vendorId: {}, isActive: {}, isFeatured: {}, page: {}, size: {}, sortBy: {}, sortDir: {}",
                                 vendorId, isActive, isFeatured, page, size, sortBy, sortDir);
+                log.info("Request URL: GET /api/menu/categories");
 
                 try {
                         Sort sort = Sort.by(Sort.Direction.fromString(sortDir), sortBy);
@@ -227,8 +105,10 @@ public class MenuController {
                         Page<MenuCategoryDto> categories = menuService.getAllCategories(vendorId, isActive, isFeatured,
                                         pageable);
 
-                        log.info("Successfully retrieved {} categories for vendorId: {}", categories.getTotalElements(),
-                                        vendorId);
+                        log.info("=== SUCCESS ===");
+                        log.info("Retrieved {} categories for vendorId: {} (Page {} of {})",
+                                        categories.getTotalElements(), vendorId, page + 1, categories.getTotalPages());
+                        log.info("Categories in current page: {}", categories.getContent().size());
 
                         return ResponseEntity.ok(ApiResponseDto.<Page<MenuCategoryDto>>builder()
                                         .success(true)
@@ -236,7 +116,9 @@ public class MenuController {
                                         .data(categories)
                                         .build());
                 } catch (Exception e) {
-                        log.error("Error retrieving categories for vendorId: {}", vendorId, e);
+                        log.error("=== ERROR ===");
+                        log.error("Failed to retrieve categories for vendorId: {}", vendorId, e);
+                        log.error("Error details: {}", e.getMessage());
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                                         .body(ApiResponseDto.<Page<MenuCategoryDto>>builder()
                                                         .success(false)
@@ -279,15 +161,30 @@ public class MenuController {
         @PostMapping("/categories")
         public ResponseEntity<ApiResponseDto<MenuCategoryDto>> createCategory(
                         @Valid @RequestBody CreateMenuCategoryRequestDto requestDto) {
-                log.info("POST /api/menu/categories - Creating category: {}", requestDto.getName());
+                log.info("=== MENU CATEGORIES - CREATE ===");
+                log.info("Request URL: POST /api/menu/categories");
+                log.info("Category Details - Name: '{}', Description: '{}', DisplayOrder: {}, IsActive: {}, IsFeatured: {}",
+                                requestDto.getName(),
+                                requestDto.getDescription() != null
+                                                ? requestDto.getDescription().substring(0,
+                                                                Math.min(50, requestDto.getDescription().length()))
+                                                                + "..."
+                                                : "null",
+                                requestDto.getDisplayOrder(),
+                                requestDto.getIsActive(),
+                                requestDto.getIsFeatured());
 
                 try {
                         Long vendorId = getCurrentVendorId();
+                        log.info("Extracted vendorId from token: {}", vendorId);
 
                         MenuCategoryDto createdCategory = menuService.createCategory(vendorId, requestDto);
 
-                        log.info("Successfully created category with ID: {} and name: {}",
-                                        createdCategory.getId(), createdCategory.getName());
+                        log.info("=== SUCCESS ===");
+                        log.info("Category created successfully - ID: {}, Name: '{}', VendorId: {}",
+                                        createdCategory.getId(), createdCategory.getName(),
+                                        createdCategory.getVendorId());
+                        log.info("Category created at: {}", createdCategory.getCreatedAt());
 
                         return ResponseEntity.status(HttpStatus.CREATED)
                                         .body(ApiResponseDto.<MenuCategoryDto>builder()
@@ -296,7 +193,10 @@ public class MenuController {
                                                         .data(createdCategory)
                                                         .build());
                 } catch (Exception e) {
-                        log.error("Error creating category: {}", requestDto.getName(), e);
+                        log.error("=== ERROR ===");
+                        log.error("Failed to create category: '{}'", requestDto.getName(), e);
+                        log.error("Error type: {}", e.getClass().getSimpleName());
+                        log.error("Error message: {}", e.getMessage());
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                                         .body(ApiResponseDto.<MenuCategoryDto>builder()
                                                         .success(false)
@@ -460,15 +360,31 @@ public class MenuController {
         @PostMapping("/items")
         public ResponseEntity<ApiResponseDto<MenuItemDto>> createMenuItem(
                         @Valid @RequestBody CreateMenuItemRequestDto requestDto) {
-                log.info("POST /api/menu/items - Creating menu item: {}", requestDto.getName());
+                log.info("=== MENU ITEMS - CREATE ===");
+                log.info("Request URL: POST /api/menu/items");
+                log.info("Menu Item Details - Name: '{}', CategoryId: {}, Price: {}, IsAvailable: {}, IsFeatured: {}",
+                                requestDto.getName(),
+                                requestDto.getCategoryId(),
+                                requestDto.getPrice(),
+                                requestDto.getIsAvailable(),
+                                requestDto.getIsFeatured());
+                log.info("Dietary Info - Vegetarian: {}, Vegan: {}, GlutenFree: {}, Spicy: {}",
+                                requestDto.getIsVegetarian(),
+                                requestDto.getIsVegan(),
+                                requestDto.getIsGlutenFree(),
+                                requestDto.getIsSpicy());
 
                 try {
                         Long vendorId = getCurrentVendorId();
+                        log.info("Extracted vendorId from token: {}", vendorId);
 
                         MenuItemDto createdItem = menuService.createMenuItem(vendorId, requestDto);
 
-                        log.info("Successfully created menu item with ID: {} and name: {}",
-                                        createdItem.getId(), createdItem.getName());
+                        log.info("=== SUCCESS ===");
+                        log.info("Menu item created successfully - ID: {}, Name: '{}', VendorId: {}, CategoryId: {}",
+                                        createdItem.getId(), createdItem.getName(), createdItem.getVendorId(),
+                                        createdItem.getCategoryId());
+                        log.info("Item created at: {}", createdItem.getCreatedAt());
 
                         return ResponseEntity.status(HttpStatus.CREATED)
                                         .body(ApiResponseDto.<MenuItemDto>builder()
@@ -477,7 +393,10 @@ public class MenuController {
                                                         .data(createdItem)
                                                         .build());
                 } catch (Exception e) {
-                        log.error("Error creating menu item: {}", requestDto.getName(), e);
+                        log.error("=== ERROR ===");
+                        log.error("Failed to create menu item: '{}'", requestDto.getName(), e);
+                        log.error("Error type: {}", e.getClass().getSimpleName());
+                        log.error("Error message: {}", e.getMessage());
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                                         .body(ApiResponseDto.<MenuItemDto>builder()
                                                         .success(false)
