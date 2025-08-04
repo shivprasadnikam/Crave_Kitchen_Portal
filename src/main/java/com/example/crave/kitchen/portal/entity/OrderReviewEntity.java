@@ -33,6 +33,9 @@ public class OrderReviewEntity {
     @JoinColumn(name = "vendor_id", nullable = false)
     private VendorProfileEntity vendor;
 
+    @Column(name = "vendor_id", nullable = false, insertable = false, updatable = false)
+    private Long vendorId;
+
     @Column(name = "rating", nullable = false)
     private Integer rating;
 

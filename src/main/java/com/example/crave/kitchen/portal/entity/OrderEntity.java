@@ -33,6 +33,9 @@ public class OrderEntity {
     @JoinColumn(name = "vendor_id", nullable = false)
     private VendorProfileEntity vendor;
 
+    @Column(name = "vendor_id", nullable = false, insertable = false, updatable = false)
+    private Long vendorId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "order_status", nullable = false, length = 50)
     private OrderStatus orderStatus = OrderStatus.PENDING;

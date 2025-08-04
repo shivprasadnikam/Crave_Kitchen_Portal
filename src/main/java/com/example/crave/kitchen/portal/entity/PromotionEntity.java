@@ -26,6 +26,9 @@ public class PromotionEntity {
     @JoinColumn(name = "vendor_id")
     private VendorProfileEntity vendor;
 
+    @Column(name = "vendor_id", insertable = false, updatable = false)
+    private Long vendorId;
+
     @Column(name = "promotion_code", unique = true, length = 50)
     private String promotionCode;
 
